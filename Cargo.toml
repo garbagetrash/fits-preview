@@ -7,3 +7,9 @@ edition = "2021"
 
 [dependencies]
 image = "0.24"
+egui_file = "0.8"
+eframe = "0.21"
+
+[[bin]]
+name = "preview"
+src = "src/bin/preview"
