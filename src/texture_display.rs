@@ -82,7 +82,6 @@ impl TextureDisplay {
             .set_margin_fraction(vec2(0.0, 0.0))
             .show(ui, |plot_ui| {
                 plot_ui.image(image.name("Image"));
-            })
-            .response;
+            });
     }
 }

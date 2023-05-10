@@ -69,7 +69,7 @@ pub fn get_image_dims(kv_pairs: &HashMap<String, String>) -> (u32, u32, u32) {
 }
 
 pub fn parse_primary_hdu(data: &[u8]) -> (HashMap<String, String>, Vec<u8>) {
-    let nblocks = data.len() / 2880;
+    let _nblocks = data.len() / 2880;
     let mut last_block = false;
 
     let mut kv_pairs: HashMap<String, String> = HashMap::new();
