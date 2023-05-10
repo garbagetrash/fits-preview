@@ -30,16 +30,7 @@ struct PreviewApp {
 impl PreviewApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        let mut output = PreviewApp {
-            selected_file: Some(PathBuf::from(
-                r"/home/styty/Pictures/Astrophotos/test/Light/L/HD_200775_Light_020.fits",
-            )),
-            ..Default::default()
-        };
-        output.set_directory(PathBuf::from(
-            r"/home/styty/Pictures/Astrophotos/test/Light/L/",
-        ));
-        output
+        Self::default()
     }
 
     fn set_directory(&mut self, dir: PathBuf) {

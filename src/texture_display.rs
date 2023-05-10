@@ -38,9 +38,9 @@ pub struct TextureDisplay {
 impl Default for TextureDisplay {
     fn default() -> Self {
         Self {
-            dx: 0,
-            dy: 0,
-            image_buffer: vec![vec![]],
+            dx: 1,
+            dy: 1,
+            image_buffer: vec![vec![0]],
         }
     }
 }
