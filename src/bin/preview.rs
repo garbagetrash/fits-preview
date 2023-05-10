@@ -34,16 +34,31 @@ impl PreviewApp {
         output.selected_file = Some(PathBuf::from(
             r"/home/styty/Pictures/Astrophotos/test/Light/L/HD_200775_Light_020.fits",
         ));
-        output.current_directory = Some(PathBuf::from(
+        let dir = PathBuf::from(
             r"/home/styty/Pictures/Astrophotos/test/Light/L/",
-        ));
+        );
+        output.set_directory(dir);
         output
+    }
+
+    fn set_directory(&mut self, dir: PathBuf) {
+        self.current_directory = Some(dir.clone());
+        // Load new files from directory here, populate `directory_files`
+        let paths = fs::read_dir(dir).expect("failed to read_dir()");
+        for path in paths {
+            let _path = path.unwrap().path();
+            if !_path.is_dir() {
+                self.directory_files.push(_path.clone());
+                let mut text = _path.to_str().unwrap().to_string();
+                text = text.split('/').last().unwrap().to_string();
+                self.directory_files_text.push(text);
+            }
+        }
     }
 }
 
 impl eframe::App for PreviewApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-
         // Image display
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.last_selected_file != self.selected_file {
@@ -53,8 +68,6 @@ impl eframe::App for PreviewApp {
                     let (dx, dy, _) = get_image_dims(&kv_pairs);
                     self.texture_display = TextureDisplay::new(dx as usize, dy as usize);
 
-                    let mut row = 0;
-                    let mut col = 0;
                     let mut temp = vec![];
                     let mut image_buffer = vec![];
                     for bytes in hdu_data.chunks(2) {
@@ -74,22 +87,56 @@ impl eframe::App for PreviewApp {
         });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            // Keyboard input
+            if ui.input(|i| i.key_released(egui::Key::ArrowUp)) {
+                if let Some(selected) = &self.selected_file {
+                    let j = match self.directory_files.iter().position(|dir| dir == selected) {
+                        Some(idx) => idx,
+                        None => 0,
+                    };
+                    if j > 0 {
+                        self.selected_file = Some(self.directory_files[j - 1].clone());
+                    }
+                } else {
+                    self.selected_file = Some(self.directory_files[0].clone());
+                }
+            } else if ui.input(|i| i.key_released(egui::Key::ArrowDown)) {
+                if let Some(selected) = &self.selected_file {
+                    let j = match self.directory_files.iter().position(|dir| dir == selected) {
+                        Some(idx) => idx,
+                        None => 0,
+                    };
+                    if j < self.directory_files.len() - 1 {
+                        self.selected_file = Some(self.directory_files[j + 1].clone());
+                    }
+                } else {
+                    self.selected_file = Some(self.directory_files[0].clone());
+                }
+            }
 
             // Currently selected directory display
             if let Some(dir) = &self.current_directory {
-                ui.heading(format!("Current Directory: {:?}", dir));
-            }
-
-            // Open directory button
-            if (ui.button("Open Directory")).clicked() {
-                let mut dialog = FileDialog::select_folder(self.current_directory.clone());
-                dialog.open();
-                self.select_dir_dialog = Some(dialog);
+                let current_directory_string = format!("{}", dir.display());
+                if (ui.button(current_directory_string)).clicked() {
+                    let mut dialog = FileDialog::select_folder(self.current_directory.clone());
+                    dialog.open();
+                    self.select_dir_dialog = Some(dialog);
+                }
+            } else {
+                if (ui.button("Choose directory...")).clicked() {
+                    let mut dialog = FileDialog::select_folder(self.current_directory.clone());
+                    dialog.open();
+                    self.select_dir_dialog = Some(dialog);
+                }
             }
 
             // File select UI
             egui::ScrollArea::vertical().show(ui, |ui| {
-                for (file, text) in self.directory_files.iter().zip(self.directory_files_text.iter()) {
+                for (file, text) in self
+                    .directory_files
+                    .iter()
+                    .zip(self.directory_files_text.iter())
+                {
                     ui.selectable_value(&mut self.selected_file, Some(file.clone()), text);
                 }
             });
@@ -98,18 +145,7 @@ impl eframe::App for PreviewApp {
             if let Some(dialog) = &mut self.select_dir_dialog {
                 if dialog.show(ctx).selected() {
                     if let Some(dir) = dialog.path() {
-                        self.current_directory = Some(dir.clone());
-                        // Load new files from directory here, populate `directory_files`
-                        let paths = fs::read_dir(dir).expect("failed to read_dir()");
-                        for path in paths {
-                            let _path = path.unwrap().path();
-                            if !_path.is_dir() {
-                                self.directory_files.push(_path.clone());
-                                let mut text = _path.to_str().unwrap().to_string();
-                                text = text.split('/').last().unwrap().to_string();
-                                self.directory_files_text.push(text);
-                            }
-                        }
+                        self.set_directory(dir);
                     }
                 }
             }
