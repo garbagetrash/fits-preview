@@ -1,16 +1,15 @@
-use std::collections::HashMap;
 use std::fs;
+use std::io::prelude::*;
 use std::path::PathBuf;
 
-use toml::Table;
 use eframe::egui;
 use egui_file::FileDialog;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use fits_preview::texture_display::TextureDisplay;
 use fits_preview::*;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct Config {
     default_directory: String,
 }
@@ -49,25 +48,39 @@ impl PreviewApp {
         if let Ok(cfg_str) = std::fs::read_to_string(&config_file) {
             if let Ok(config) = toml::from_str::<Config>(&cfg_str) {
                 println!("Using config file found at: {}", config_file);
-                app.set_directory(PathBuf::from(config.default_directory));
+                app.set_directory(&PathBuf::from(config.default_directory));
             }
         }
 
         app
     }
 
-    fn set_directory(&mut self, dir: PathBuf) {
+    fn set_directory(&mut self, dir: &PathBuf) {
+        self.directory_files.clear();
+        self.directory_files_text.clear();
         self.current_directory = Some(dir.clone());
         // Load new files from directory here, populate `directory_files`
-        let paths = fs::read_dir(dir).expect("failed to read_dir()");
+        let mut paths: Vec<_> = fs::read_dir(dir).expect("failed to read_dir()").filter_map(Result::ok).collect();
+        paths.sort_by_key(|x| x.path());
         for path in paths {
-            let _path = path.unwrap().path();
+            let _path = path.path();
             if !_path.is_dir() {
                 self.directory_files.push(_path.clone());
                 let mut text = _path.to_str().unwrap().to_string();
                 text = text.split('/').last().unwrap().to_string();
                 self.directory_files_text.push(text);
             }
+        }
+    }
+
+    fn push_directory_to_config(&mut self, dir: &PathBuf) {
+        // Try to load config file if it exists
+        // Use `$HOME/.config/fits_preview/config.toml`
+        let home = std::env::var("HOME").expect("failed to find env var `HOME`");
+        let config_file = format!("{}/.config/fits_preview/config.toml", home);
+        let config = Config { default_directory: dir.clone().into_os_string().into_string().expect("failed to convert PathBuf to string") };
+        if let Ok(mut file) = std::fs::File::create(config_file) {
+            file.write_all(toml::to_string(&config).expect("failed to serialize Config").as_bytes()).expect("failed to write to file");
         }
     }
 }
@@ -164,7 +177,9 @@ impl eframe::App for PreviewApp {
                 if let Some(dialog) = &mut self.select_dir_dialog {
                     if dialog.show(ctx).selected() {
                         if let Some(dir) = dialog.path() {
-                            self.set_directory(dir);
+                            println!("Setting directory to {}", dir.clone().into_os_string().into_string().unwrap());
+                            self.set_directory(&dir);
+                            self.push_directory_to_config(&dir);
                         }
                     }
                 }
