@@ -1,11 +1,19 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use toml::Table;
 use eframe::egui;
 use egui_file::FileDialog;
+use serde::Deserialize;
 
 use fits_preview::texture_display::TextureDisplay;
 use fits_preview::*;
+
+#[derive(Deserialize)]
+struct Config {
+    default_directory: String,
+}
 
 #[derive(Default)]
 struct PreviewApp {
@@ -30,7 +38,22 @@ struct PreviewApp {
 impl PreviewApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        Self::default()
+
+        // Create our base app
+        let mut app = Self::default();
+
+        // Try to load config file if it exists
+        // Use `$HOME/.config/fits_preview/config.toml`
+        let home = std::env::var("HOME").expect("failed to find env var `HOME`");
+        let config_file = format!("{}/.config/fits_preview/config.toml", home);
+        if let Ok(cfg_str) = std::fs::read_to_string(&config_file) {
+            if let Ok(config) = toml::from_str::<Config>(&cfg_str) {
+                println!("Using config file found at: {}", config_file);
+                app.set_directory(PathBuf::from(config.default_directory));
+            }
+        }
+
+        app
     }
 
     fn set_directory(&mut self, dir: PathBuf) {
@@ -79,8 +102,7 @@ impl eframe::App for PreviewApp {
         });
 
         egui::SidePanel::left("side_panel")
-            .default_width(350.0)
-            .resizable(false)
+            .default_width(250.0)
             .show(ctx, |ui| {
                 // Keyboard input
                 if ui.input(|i| i.key_released(egui::Key::ArrowUp)) {
@@ -126,15 +148,17 @@ impl eframe::App for PreviewApp {
                 }
 
                 // File select UI
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (file, text) in self
-                        .directory_files
-                        .iter()
-                        .zip(self.directory_files_text.iter())
-                    {
-                        ui.selectable_value(&mut self.selected_file, Some(file.clone()), text);
-                    }
-                });
+                egui::ScrollArea::vertical()
+                    .min_scrolled_width(250.0)
+                    .show(ui, |ui| {
+                        for (file, text) in self
+                            .directory_files
+                            .iter()
+                            .zip(self.directory_files_text.iter())
+                        {
+                            ui.selectable_value(&mut self.selected_file, Some(file.clone()), text);
+                        }
+                    });
 
                 // Directory select dialog box
                 if let Some(dialog) = &mut self.select_dir_dialog {

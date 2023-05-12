@@ -6,9 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = "0.24"
-egui_file = "0.8"
 eframe = "0.21"
+egui_file = "0.8"
+image = "0.24"
+serde = { version = "1", features = ["derive"] }
+toml = "0.7"
 
 [[bin]]
 name = "preview"
