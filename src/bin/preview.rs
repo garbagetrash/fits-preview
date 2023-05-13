@@ -1,12 +1,12 @@
 use std::fs;
 use std::io::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use eframe::egui;
+use egui_extras::RetainedImage;
 use egui_file::FileDialog;
 use serde::{Deserialize, Serialize};
 
-use fits_preview::texture_display::TextureDisplay;
 use fits_preview::*;
 
 #[derive(Deserialize, Serialize)]
@@ -31,7 +31,8 @@ struct PreviewApp {
     select_dir_dialog: Option<FileDialog>,
 
     // The rendered image
-    texture_display: TextureDisplay,
+    //texture_display: TextureDisplay,
+    image: Option<RetainedImage>,
 }
 
 impl PreviewApp {
@@ -60,7 +61,10 @@ impl PreviewApp {
         self.directory_files_text.clear();
         self.current_directory = Some(dir.clone());
         // Load new files from directory here, populate `directory_files`
-        let mut paths: Vec<_> = fs::read_dir(dir).expect("failed to read_dir()").filter_map(Result::ok).collect();
+        let mut paths: Vec<_> = fs::read_dir(dir)
+            .expect("failed to read_dir()")
+            .filter_map(Result::ok)
+            .collect();
         paths.sort_by_key(|x| x.path());
         for path in paths {
             let _path = path.path();
@@ -73,14 +77,26 @@ impl PreviewApp {
         }
     }
 
-    fn push_directory_to_config(&mut self, dir: &PathBuf) {
+    fn push_directory_to_config(&mut self, dir: &Path) {
         // Try to load config file if it exists
         // Use `$HOME/.config/fits_preview/config.toml`
         let home = std::env::var("HOME").expect("failed to find env var `HOME`");
-        let config_file = format!("{}/.config/fits_preview/config.toml", home);
-        let config = Config { default_directory: dir.clone().into_os_string().into_string().expect("failed to convert PathBuf to string") };
+        let config_dir = format!("{}/.config/fits_preview", home);
+        let config_file = format!("{}/config.toml", &config_dir);
+        fs::create_dir_all(&config_dir).expect("failed to create config dir");
+        let config = Config {
+            default_directory: dir
+                .to_str()
+                .expect("failed to convert PathBuf to string")
+                .to_string(),
+        };
         if let Ok(mut file) = std::fs::File::create(config_file) {
-            file.write_all(toml::to_string(&config).expect("failed to serialize Config").as_bytes()).expect("failed to write to file");
+            file.write_all(
+                toml::to_string(&config)
+                    .expect("failed to serialize Config")
+                    .as_bytes(),
+            )
+            .expect("failed to write to file");
         }
     }
 }
@@ -94,24 +110,26 @@ impl eframe::App for PreviewApp {
                     let data = std::fs::read(pathbuf).expect("failed to open file");
                     let (kv_pairs, hdu_data) = parse_primary_hdu(&data);
                     let (dx, dy, _) = get_image_dims(&kv_pairs);
-                    self.texture_display = TextureDisplay::new(dx as usize, dy as usize);
 
-                    let mut temp = vec![];
-                    let mut image_buffer = vec![];
+                    let mut rgb: Vec<u8> = vec![];
                     for bytes in hdu_data.chunks(2) {
-                        temp.push((i16::from_be_bytes([bytes[0], bytes[1]]) as i32 + 32768) as u16);
-                        if temp.len() == dx as usize {
-                            image_buffer.push(temp);
-                            temp = vec![];
-                        }
+                        let value =
+                            (i16::from_be_bytes([bytes[0], bytes[1]]) as i32 + 32768) as u16;
+                        rgb.push((value >> 8) as u8);
+                        rgb.push((value >> 8) as u8);
+                        rgb.push((value >> 8) as u8);
                     }
-                    self.texture_display.image_buffer = image_buffer;
+                    let image = egui::ColorImage::from_rgb([dx as usize, dy as usize], &rgb);
+                    self.image = Some(RetainedImage::from_color_image("color_image", image));
                     self.last_selected_file = self.selected_file.clone();
                 }
             }
 
             // Show the image
-            self.texture_display.plot(ui);
+            //self.texture_display.plot(ui);
+            if let Some(image) = &self.image {
+                image.show(ui);
+            }
         });
 
         egui::SidePanel::left("side_panel")
@@ -177,7 +195,10 @@ impl eframe::App for PreviewApp {
                 if let Some(dialog) = &mut self.select_dir_dialog {
                     if dialog.show(ctx).selected() {
                         if let Some(dir) = dialog.path() {
-                            println!("Setting directory to {}", dir.clone().into_os_string().into_string().unwrap());
+                            println!(
+                                "Setting directory to {}",
+                                dir.clone().into_os_string().into_string().unwrap()
+                            );
                             self.set_directory(&dir);
                             self.push_directory_to_config(&dir);
                         }

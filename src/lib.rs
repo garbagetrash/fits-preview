@@ -20,7 +20,6 @@
 // ...
 // END
 
-pub mod texture_display;
 use std::collections::HashMap;
 
 fn parse_hdu_block(data: &[u8]) -> HashMap<String, String> {
