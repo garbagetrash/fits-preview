@@ -1,4 +1,5 @@
 use std::fs;
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,7 @@ struct PreviewApp {
     // The currently selected file
     selected_file: Option<PathBuf>,
     last_selected_file: Option<PathBuf>,
+    metadata: Option<HashMap<String, String>>,
 
     // Object to select a directory
     select_dir_dialog: Option<FileDialog>,
@@ -110,6 +112,7 @@ impl eframe::App for PreviewApp {
                     let data = std::fs::read(pathbuf).expect("failed to open file");
                     let (kv_pairs, hdu_data) = parse_primary_hdu(&data);
                     let (dx, dy, _) = get_image_dims(&kv_pairs);
+                    self.metadata = Some(kv_pairs);
 
                     let mut rgb: Vec<u8> = vec![];
                     for bytes in hdu_data.chunks(2) {
@@ -203,6 +206,17 @@ impl eframe::App for PreviewApp {
                             self.push_directory_to_config(&dir);
                         }
                     }
+                }
+            });
+
+        egui::SidePanel::right("meta_panel")
+            .default_width(250.0)
+            .show(ctx, |ui| {
+                if let Some(metadata) = &self.metadata {
+                    let xres = metadata.get("NAXIS1").unwrap().split('/').take(1).collect::<String>().trim().to_string();
+                    let yres = metadata.get("NAXIS2").unwrap().split('/').take(1).collect::<String>().trim().to_string();
+                    ui.label(&format!("Resolution: {}x{}", xres, yres));
+                    ui.separator();
                 }
             });
     }
