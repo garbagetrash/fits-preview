@@ -210,12 +210,21 @@ impl eframe::App for PreviewApp {
             });
 
         egui::SidePanel::right("meta_panel")
-            .default_width(250.0)
+            .default_width(200.0)
+            .min_width(200.0)
             .show(ctx, |ui| {
                 if let Some(metadata) = &self.metadata {
                     let xres = metadata.get("NAXIS1").unwrap().split('/').take(1).collect::<String>().trim().to_string();
                     let yres = metadata.get("NAXIS2").unwrap().split('/').take(1).collect::<String>().trim().to_string();
                     ui.label(&format!("Resolution: {}x{}", xres, yres));
+
+                    let lat = metadata.get("SITELAT").unwrap().split('/').take(1).collect::<String>().trim().to_string();
+                    let lon = metadata.get("SITELONG").unwrap().split('/').take(1).collect::<String>().trim().to_string();
+                    ui.label(&format!("Location:\n{} N {} E", lat, lon));
+
+                    let az = metadata.get("OBJCTAZ").unwrap().split('/').take(1).collect::<String>().trim().to_string();
+                    let el = metadata.get("OBJCTALT").unwrap().split('/').take(1).collect::<String>().trim().to_string();
+                    ui.label(&format!("Object AZ EL:\n{} deg. {} deg.", az, el));
                     ui.separator();
                 }
             });
